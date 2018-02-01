@@ -1,7 +1,5 @@
 #!/bin/bash
 
-verbose_ssh=''
-verbose_rsync=''
 version=0.0.2
 
 set -e
@@ -12,30 +10,38 @@ if [ "$1" == "--install" ]; then
   exit
 fi
 
-for i in `seq 1 2`;
+verbose_ssh='-o LogLevel=QUIET'
+verbose_rsync=''
+verbose=''
+
+for i in `seq 1 4`;
 do
   if [ "$1" == "--verbose" ] || [ "$1" == "-v" ]; then
     shift
     verbose_rsync="$verbose_rsync --progress"
-  fi
-  if [ "$1" == "--debug" ] || [ "$1" == "-d" ]; then
+    verbose='T'
+  elif [ "$1" == "--debug" ] || [ "$1" == "-d" ]; then
     shift
     verbose_rsync="$verbose_rsync -v --stats -i"
-    verbose_ssh="$verbose_ssh -v"
+    verbose_ssh="-v"
+    verbose='T'
   fi
 done
 
 if [ -z $1 ] || [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
   echo "usage: rex [options] [command]"
   echo "   rex [options] command   sync and run command remotely"
+  echo "       --verbose, -v       show verbose output"
+  echo "       --debug, -d         show debug output"
+  echo "usage: rex [option]"
   echo "   rex --init config, -i   init new config"
   echo "   rex --select config, -s activate config"
   echo "   rex --list, -l          list available configs"
   echo "   rex --current, -c       show current config"
+  echo "   rex --push              sync local to remote"
+  echo "   rex --pull              sync remote to local"
   echo "   rex --version           show version"
   echo "   rex --help, -h          show help"
-  echo "       --verbose, -v       show verbose output"
-  echo "       --debug, -d         show debug output"
   exit
 fi
 
@@ -79,6 +85,19 @@ if [ "$1" == "--version" ]; then
   exit
 fi
 
+push_only=''
+pull_only=''
+dry=''
+if [ "$1" == "--push" ]; then
+  shift
+  push_only='T'
+  dry='T'
+elif [ "$1" == "--pull" ]; then
+  shift
+  pull_only='T'
+  dry='T'
+fi
+
 if [ "${1:0:1}" == '-' ]; then echo "unknown option '$1', try '--help'"; exit 1; fi
 
 . .rex/$current
@@ -90,14 +109,21 @@ if [ -z ${path+x} ]; then echo "'path=' not in config"; exit 1; fi
 if [ -z ${sync+x} ]; then echo "'sync=' not in config"; exit 1; fi
 if [ -z ${ignore+x} ]; then echo "'ignore=' not in config"; exit 1; fi
 
-if [ ! -z $verbose_rsync ]; then
-  set -x
-fi
-
 exclude="${ignore//,/ --exclude=}"
 
-rsync $verbose_rsync -aze "ssh -p $port" --exclude=$exclude --exclude=.* --delete . $user@$addr:$path
+if [ -z $pull_only ]; then
+  if [ ! -z $verbose ]; then echo "pushing full tree"; fi
+  rsync $verbose_rsync -aze "ssh -p $port" --exclude="$exclude" --exclude=.* --exclude="$sync" --delete . "$user@$addr:$path"
+  if [ ! -z $verbose ]; then echo "pushing '$sync' folder"; fi
+  rsync $verbose_rsync -aze "ssh -p $port" --exclude="$exclude" --exclude=.* "$sync/" "$user@$addr:$path/$sync"
+fi
 
-ssh $verbose_ssh -o LogLevel=QUIET -t -p $port $user@$addr "cd $path && mkdir -p $sync && $@"
+if [ -z $dry ]; then
+  if [ ! -z $verbose ]; then echo "running remote command '$@'"; fi
+  ssh $verbose_ssh -t -p "$port" "$user@$addr" "cd $path && mkdir -p $sync && $@"
+fi
 
-rsync $verbose_rsync -aze "ssh -p $port" --exclude={$ignore} $user@$addr:$path/$sync/ $sync
+if [ -z $push_only ]; then
+  if [ ! -z $verbose ]; then echo "pulling '$sync' folder"; fi
+  rsync $verbose_rsync -aze "ssh -p $port" --exclude="$exclude" --exclude=.* "$user@$addr:$path/$sync/" "$sync"
+fi
