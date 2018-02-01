@@ -2,6 +2,9 @@
 
 verbose_ssh=''
 verbose_rsync=''
+version=0.0.2
+
+set -e
 
 if [ "$1" == "--install" ]; then
   if [ ! -f bin/rex ]; then echo "cannot install from here"; exit 1; fi
@@ -29,6 +32,7 @@ if [ -z $1 ] || [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
   echo "   rex --select config, -s activate config"
   echo "   rex --list, -l          list available configs"
   echo "   rex --current, -c       show current config"
+  echo "   rex --version           show version"
   echo "   rex --help, -h          show help"
   echo "       --verbose, -v       show verbose output"
   echo "       --debug, -d         show debug output"
@@ -67,6 +71,11 @@ if [ ! -f .rex/$current ]; then echo "invalid config selected, try '--select con
 
 if [ "$1" == "--current" ] || [ "$1" == "-c" ]; then
   cat .rex/$current
+  exit
+fi
+
+if [ "$1" == "--version" ]; then
+  echo $version
   exit
 fi
 
