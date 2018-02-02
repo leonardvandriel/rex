@@ -1,129 +1,274 @@
 #!/bin/bash
-
-version=0.0.2
+#
+# rex
+#
+# A simple utility to develop code locally, but test and run in remotely. By
+# prefixing your command with 'rex', your application will be built and run
+# remotely. Output is echoed right back and the folder tree is synced before
+# and after. As seemless as it gets.
+#
 
 set -e
 
-if [ "$1" == "--install" ]; then
-  if [ ! -f bin/rex ]; then echo "cannot install from here"; exit 1; fi
-  cp bin/rex /usr/local/bin
-  exit
-fi
+script_version=0.0.2
+script_bin=rex
+script_dir=.rex
+script_current=.current
 
-verbose_ssh='-o LogLevel=QUIET'
-verbose_rsync=''
-verbose=''
+show_help() {
+  cat <<END
+usage: $script_bin [options] [command]
+   $script_bin [options] command   sync and run command remotely
+       --run, -r           only run command, no sync
+       --verbose, -v       show verbose output
+       --debug, -d         show debug output
+usage: $script_bin [option]
+   $script_bin --init config, -i   setup new config
+   $script_bin --select config, -s activate config
+   $script_bin --edit config, -e   edit existing config
+   $script_bin --list, -l          list available configs
+   $script_bin --current, -c       show current config
+   $script_bin --push, -s          sync local to remote
+   $script_bin --pull, -p          sync remote to local
+   $script_bin --version           show version
+   $script_bin --help, -h          show help
+END
+}
 
-for i in `seq 1 4`;
-do
-  if [ "$1" == "--verbose" ] || [ "$1" == "-v" ]; then
-    shift
-    verbose_rsync="$verbose_rsync --progress"
-    verbose='T'
-  elif [ "$1" == "--debug" ] || [ "$1" == "-d" ]; then
-    shift
-    verbose_rsync="$verbose_rsync -v --stats -i"
-    verbose_ssh="-v"
-    verbose='T'
+push_tree() {
+  local host_path="$user@$addr:$path"
+  if [[ "$verbose_log" = true ]]; then log "pushing full tree to '$host_path'.."; fi
+  rsync $verbose_rsync -aze "ssh -p $port" --exclude="$exclude_dirs" --exclude=.* --exclude="$sync" --delete . "$host_path"
+  if [[ -n "$sync" ]] && [[ -d "$sync" ]]; then
+    if [[ "$verbose_log" = true ]]; then log "pushing '$sync' folder.."; fi
+    rsync $verbose_rsync -aze "ssh -p $port" --exclude="$exclude_dirs" --exclude=.* "$sync/" "$host_path/$sync"
   fi
-done
+}
 
-if [ -z $1 ] || [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
-  echo "usage: rex [options] [command]"
-  echo "   rex [options] command   sync and run command remotely"
-  echo "       --verbose, -v       show verbose output"
-  echo "       --debug, -d         show debug output"
-  echo "usage: rex [option]"
-  echo "   rex --init config, -i   init new config"
-  echo "   rex --select config, -s activate config"
-  echo "   rex --list, -l          list available configs"
-  echo "   rex --current, -c       show current config"
-  echo "   rex --push              sync local to remote"
-  echo "   rex --pull              sync remote to local"
-  echo "   rex --version           show version"
-  echo "   rex --help, -h          show help"
-  exit
-fi
+run_command() {
+  local host_path="$user@$addr:$path"
+  local cmd="$@"
+  if [[ -z "$cmd" ]]; then err "no command provided" "run ls"; fi
+  if [[ "$verbose_log" = true ]]; then log "running remote command '$*' on '$host_path'.."; fi
+  local line=""
+  if [[ -n "$path" ]]; then line="$line cd $path"; fi
+  if [[ -n "$sync" ]]; then line="$line && mkdir -p $sync"; fi
+  if [[ -n "$line" ]]; then line="$line; "; fi
+  ssh "$verbose_ssh" -t -p "$port" "$user@$addr" "$line$*"
+}
 
-if [ "$1" == "--init" ] || [ "$1" == "-i" ]; then
-  if [ -z $2 ]; then echo "specify config to init, try '--init config"; exit 1; fi
-  if [ -f .rex/$2 ]; then echo "config '$2' already exists, try '--select $2'"; exit 1; fi
-  mkdir -p .rex
-  echo "user=username\naddr=192.168.0.10\nport=22\npath=files/project\nsync=output\nignore=bin,build,tmp" > .rex/$2
-  cat .rex/$2
-  echo "$2" > .rex/.current
-  "${EDITOR:-vi}" .rex/$2
-  exit
-fi
+pull_tree() {
+  local host_path="$user@$addr:$path"
+  if [[ -n "$sync" ]]; then
+    if [[ "$verbose_log" = true ]]; then log "pulling '$sync' folder from '$host_path'.."; fi
+    rsync $verbose_rsync -aze "ssh -p $port" --exclude="$exclude_dirs" --exclude=.* "$host_path/$sync/" "$sync"
+  fi
+}
 
-if [ "$1" == "--select" ] || [ "$1" == "-s" ]; then
-  available=$(ls -1 .rex | tr '\n' '/')
-  if [ -z $2 ]; then echo "specify config to select, try: '--select ${available%?}'"; exit 1; fi
-  if [ ! -f .rex/$2 ]; then echo "config '$2' does not exist, try: '--select ${available%?}'"; exit 1; fi
-  echo "$2" > .rex/.current
-  exit
-fi
+init_config() {
+  local config_file="$script_dir/$1"
+  local current_file="$script_dir/$script_current"
+  mkdir -p "$script_dir"
+  cat > "$config_file" <<-END
+user=username
+addr=0.0.0.0
+port=22
+path=project_dir
+sync=output_dir
+ignore=bin,build,tmp
+END
+  cat "$config_file"
+  echo "$1" > "$current_file"
+  edit_config $1
+}
 
-if [ "$1" == "--list" ] || [ "$1" == "-l" ]; then
-  ls -1 .rex
-  exit
-fi
+edit_config() {
+  "${EDITOR:-nano}" "$script_dir/$1"
+}
 
-if [ ! -f .rex/.current ]; then echo "no config selected, try '--init config'"; exit 1; fi
+select_config() {
+  echo "$1" > "$script_dir/$script_current"
+}
 
-current=$(cat .rex/.current)
+list_config() {
+  ls -1 "$script_dir"
+}
 
-if [ ! -f .rex/$current ]; then echo "invalid config selected, try '--select config'"; exit 1; fi
+show_config() {
+  log "#$current_config"
+  cat "$script_dir/$current_config"
+}
 
-if [ "$1" == "--current" ] || [ "$1" == "-c" ]; then
-  cat .rex/$current
-  exit
-fi
+load_config() {
+  . "$script_dir/$current_config"
+  local try="--edit $current_config"
+  if [[ -z ${user+x} ]]; then err "'user' not in config" "$try"; fi
+  if [[ -z ${addr+x} ]]; then err "'addr' not in config" "$try"; fi
+  if [[ -z ${port+x} ]]; then err "'port' not in config" "$try"; fi
+  if [[ -z ${path+x} ]]; then err "'path' not in config" "$try"; fi
+  if [[ -z ${sync+x} ]]; then err "'sync' not in config" "$try"; fi
+  if [[ -z ${ignore+x} ]]; then err "'ignore' not in config" "$try"; fi
 
-if [ "$1" == "--version" ]; then
-  echo $version
-  exit
-fi
+  if [[ -z "$user" ]]; then err "'user' not set in config" "$try"; fi
+  if [[ -z "$addr" ]]; then err "'addr' not set in config" "$try"; fi
+  if [[ -z "$port" ]]; then err "'port' not set in config" "$try"; fi
+  if [[ -z "$path" ]]; then err "'path' not set in config" "$try"; fi
+}
 
-push_only=''
-pull_only=''
-dry=''
-if [ "$1" == "--push" ]; then
-  shift
-  push_only='T'
-  dry='T'
-elif [ "$1" == "--pull" ]; then
-  shift
-  pull_only='T'
-  dry='T'
-fi
+install_bin() {
+  cp "bin/$script_bin" "/usr/local/bin"
+}
 
-if [ "${1:0:1}" == '-' ]; then echo "unknown option '$1', try '--help'"; exit 1; fi
+show_version() {
+  echo "$script_version"
+}
 
-. .rex/$current
+err() {
+  if [[ -n "$2" ]]; then
+    echo "$0: $1, try '$script_bin $2'" >&2
+  else
+    echo "$0: $1" >&2
+  fi
+  exit 1
+}
 
-if [ -z ${user+x} ]; then echo "'user=' not in config"; exit 1; fi
-if [ -z ${addr+x} ]; then echo "'addr=' not in config"; exit 1; fi
-if [ -z ${port+x} ]; then echo "'port=' not in config"; exit 1; fi
-if [ -z ${path+x} ]; then echo "'path=' not in config"; exit 1; fi
-if [ -z ${sync+x} ]; then echo "'sync=' not in config"; exit 1; fi
-if [ -z ${ignore+x} ]; then echo "'ignore=' not in config"; exit 1; fi
+log() {
+  echo "$1"
+}
 
-exclude="${ignore//,/ --exclude=}"
+main() {
 
-if [ -z $pull_only ]; then
-  if [ ! -z $verbose ]; then echo "pushing full tree"; fi
-  rsync $verbose_rsync -aze "ssh -p $port" --exclude="$exclude" --exclude=.* --exclude="$sync" --delete . "$user@$addr:$path"
-  if [ ! -z $verbose ]; then echo "pushing '$sync' folder"; fi
-  rsync $verbose_rsync -aze "ssh -p $port" --exclude="$exclude" --exclude=.* "$sync/" "$user@$addr:$path/$sync"
-fi
+  ## handle meta flags
 
-if [ -z $dry ]; then
-  if [ ! -z $verbose ]; then echo "running remote command '$@'"; fi
-  ssh $verbose_ssh -t -p "$port" "$user@$addr" "cd $path && mkdir -p $sync && $@"
-fi
+  if [[ -z "$1" ]] || [[ "$1" = "--help" ]] || [[ "$1" = "-h" ]]; then
+    show_help
+    exit
+  fi
 
-if [ -z $push_only ]; then
-  if [ ! -z $verbose ]; then echo "pulling '$sync' folder"; fi
-  rsync $verbose_rsync -aze "ssh -p $port" --exclude="$exclude" --exclude=.* "$user@$addr:$path/$sync/" "$sync"
-fi
+  if [[ "$1" = "--install" ]]; then
+    if [[ -n "$2" ]]; then err "unknown argument '$2'" "--install"; fi
+    if [[ ! -f "bin/$script_bin" ]]; then err "can only install from source"; fi
+    install_bin
+    exit
+  fi
+
+  if [[ "$1" = "--version" ]]; then
+    if [[ -n "$2" ]]; then err "unknown argument '$2'" "--version"; fi
+    show_version
+    exit
+  fi
+
+  ## handle setup options
+
+  if [[ "$1" = "--init" ]] || [[ "$1" = "-i" ]]; then
+    if [[ -n "$3" ]]; then err "unknown argument '$3'" "--init $2"; fi
+    if [[ -z "$2" ]]; then err "specify config to init" "--init config"; fi
+    if [[ -f "$script_dir/$2" ]]; then err "config '$2' already exists" "--select $2"; fi
+    init_config "$2"
+    exit
+  fi
+
+  if [[ ! -d "$script_dir" ]]; then err "first setup new config" "--init config"; fi
+
+  available="$(ls -1 "$script_dir" | tr '\n' '/')"
+  available="${available%?}"
+
+  if [[ "$1" = "--select" ]] || [[ "$1" = "-s" ]]; then
+    if [[ -n "$3" ]]; then err "unknown argument '$3'" "--select $2"; fi
+    if [[ -z "$2" ]]; then err "specify config to select" "--select ${available}"; fi
+    if [[ ! -f "$script_dir/$2" ]]; then err "config '$2' does not exist" "--select ${available}"; fi
+    select_config "$2"
+    exit
+  fi
+
+  if [[ "$1" = "--list" ]] || [[ "$1" = "-l" ]]; then
+    if [[ -n "$2" ]]; then err "unknown argument '$2'" "--list"; fi
+    list_config
+    exit
+  fi
+
+  if [[ "$1" = "--edit" ]] || [[ "$1" = "-e" ]]; then
+    if [[ -n "$3" ]]; then err "unknown argument '$3'" "--edit $2"; fi
+    if [[ -z "$2" ]]; then err "specify config to edit" "--edit ${available}"; fi
+    if [[ ! -f "$script_dir/$2" ]]; then err "config '$2' does not exist" "--edit ${available}"; fi
+    edit_config "$2"
+    exit
+  fi
+
+  ## find config
+
+  if [[ ! -f "$script_dir/$script_current" ]]; then err "no config selected" "--init config"; fi
+
+  current_config="$(cat "$script_dir/$script_current")"
+
+  if [[ ! -f "$script_dir/$current_config" ]]; then err "invalid config selected" "--select ${available}"; fi
+
+  if [[ "$1" = "--current" ]] || [[ "$1" = "-c" ]]; then
+    if [[ -n "$2" ]]; then err "unknown argument '$2'" "--current"; fi
+    show_config
+    exit
+  fi
+
+  load_config
+  exclude_dirs="${ignore//,/ --exclude=}"
+
+  ## strip run flags
+
+  verbose_ssh="-o LogLevel=QUIET"
+  verbose_rsync=""
+  verbose_log=false
+  run_only=false
+
+  while true; do
+    case "$1" in
+      -v|--verbose)
+        verbose_rsync="$verbose_rsync --progress"
+        verbose_log=true
+        shift
+        ;;
+      -d|--debug)
+        verbose_rsync="$verbose_rsync -v --stats -i"
+        verbose_ssh="-v"
+        verbose_log=true
+        set -x
+        shift
+        ;;
+      -r|--run)
+        run_only=true
+        shift
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done
+
+  ## handle reduced runs
+
+  if [[ "$run_only" = true ]]; then
+    run_command "$*"
+    exit
+  fi
+
+  if [[ "$1" = "--push" ]] || [[ "$1" = "-s" ]]; then
+    if [[ -n "$2" ]]; then err "unknown argument '$2'" "--push"; fi
+    push_tree
+    exit
+  fi
+
+  if [[ "$1" = "--pull" ]] || [[ "$1" = "-p" ]]; then
+    if [[ -n "$2" ]]; then err "unknown argument '$2'" "--pull"; fi
+    pull_tree
+    exit
+  fi
+
+  ## run command
+
+  if [[ "${1:0:1}" = '-' ]]; then err "unknown option '$1'" "--help"; fi
+
+  push_tree
+  run_command "$*"
+  pull_tree
+}
+
+main "$@"
