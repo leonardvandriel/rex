@@ -38,10 +38,10 @@ END
 push_tree() {
   local host_path="$user@$addr:$path"
   if [[ "$verbose_log" = true ]]; then log "pushing full tree to '$host_path'.."; fi
-  rsync $verbose_rsync -aze "ssh -p $port" --exclude="$exclude_dirs" --exclude=.* --exclude="$sync" --delete . "$host_path"
+  rsync $verbose_rsync -aze "ssh -p $port" $(exclude_arg $ignore $sync) --delete . "$host_path"
   if [[ -n "$sync" ]] && [[ -d "$sync" ]]; then
     if [[ "$verbose_log" = true ]]; then log "pushing '$sync' folder.."; fi
-    rsync $verbose_rsync -aze "ssh -p $port" --exclude="$exclude_dirs" --exclude=.* "$sync/" "$host_path/$sync"
+    rsync $verbose_rsync -aze "ssh -p $port" $(exclude_arg $ignore) "$sync/" "$host_path/$sync"
   fi
 }
 
@@ -61,7 +61,7 @@ pull_tree() {
   local host_path="$user@$addr:$path"
   if [[ -n "$sync" ]]; then
     if [[ "$verbose_log" = true ]]; then log "pulling '$sync' folder from '$host_path'.."; fi
-    rsync $verbose_rsync -aze "ssh -p $port" --exclude="$exclude_dirs" --exclude=.* "$host_path/$sync/" "$sync"
+    rsync $verbose_rsync -aze "ssh -p $port" $(exclude_arg $ignore) "$host_path/$sync/" "$sync"
   fi
 }
 
@@ -75,7 +75,7 @@ addr=0.0.0.0
 port=22
 path=project_dir
 sync=output_dir
-ignore=bin,build,tmp
+ignore=.*,bin,build,tmp
 END
   cat "$config_file"
   echo "$1" > "$current_file"
@@ -121,6 +121,16 @@ install_bin() {
 
 show_version() {
   echo "$script_version"
+}
+
+exclude_arg() {
+  local list="$script_dir"
+  if [[ -n "$1" ]]; then list="$list,$1"; fi
+  if [[ -n "$2" ]]; then list="$list,$2"; fi
+  if [[ -n "$3" ]]; then list="$list,$3"; fi
+  if [[ -n "$4" ]]; then list="$list,$4"; fi
+  local args="--exclude=/${list//,/ --exclude=/}"
+  echo "$args"
 }
 
 err() {
@@ -210,7 +220,6 @@ main() {
   fi
 
   load_config
-  exclude_dirs="${ignore//,/ --exclude=}"
 
   ## strip run flags
 

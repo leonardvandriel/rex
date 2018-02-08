@@ -25,7 +25,7 @@ First create a config file that specifes the remote ip address and folder names:
 * `port`: port number to connect to, e.g. `22`
 * `path`: relative path on remote, e.g.  `projects/mything`
 * `sync`: folder to sync after running the command, e.g. `output` or `data`
-* `ignore`: list of files and folders to exclude, e.g. `bin,tmp`
+* `ignore`: list of files and folders to exclude, e.g. `.*,bin,tmp`
 
 WARNING: *rex overwrites all remote files and folders on every run. Make sure to __backup all important data__ on the remote before continuing.*
 
