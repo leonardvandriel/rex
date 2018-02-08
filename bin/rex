@@ -9,6 +9,7 @@
 #
 
 set -e
+set -f
 
 script_version=0.0.2
 script_bin=rex
