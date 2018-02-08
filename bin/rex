@@ -28,8 +28,8 @@ usage: $script_bin [option]
    $script_bin --edit config, -e   edit existing config
    $script_bin --list, -l          list available configs
    $script_bin --current, -c       show current config
-   $script_bin --push, -s          sync local to remote
-   $script_bin --pull, -p          sync remote to local
+   $script_bin --push, -s          sync push dir to remote
+   $script_bin --pull, -p          sync pull dir to local
    $script_bin --version           show version
    $script_bin --help, -h          show help
 END
@@ -38,10 +38,11 @@ END
 push_tree() {
   local host_path="$user@$addr:$path"
   if [[ "$verbose_log" = true ]]; then log "pushing full tree to '$host_path'.."; fi
-  rsync $verbose_rsync -aze "ssh -p $port" $(exclude_arg $ignore $sync) --delete . "$host_path"
-  if [[ -n "$sync" ]]; then
-    if [[ "$verbose_log" = true ]]; then log "pushing '$sync' folder.."; fi
-    for dir in ${sync//,/ }; do
+  rsync $verbose_rsync -aze "ssh -p $port" $(exclude_arg $ignore $pull $push) --delete . "$host_path"
+  if [[ -n "$push" ]]; then
+    if [[ "$verbose_log" = true ]]; then log "pushing '$push' folder.."; fi
+    mkdir -p ${push//,/ }
+    for dir in ${push//,/ }; do
       rsync $verbose_rsync -aze "ssh -p $port" "$dir/" "$host_path/$dir"
     done
   fi
@@ -54,16 +55,16 @@ run_command() {
   if [[ "$verbose_log" = true ]]; then log "running remote command '$*' on '$host_path'.."; fi
   local line=""
   if [[ -n "$path" ]]; then line="$line cd $path"; fi
-  if [[ -n "$sync" ]]; then line="$line && mkdir -p ${sync//,/ }"; fi
+  if [[ -n "$pull" ]]; then line="$line && mkdir -p ${pull//,/ }"; fi
   if [[ -n "$line" ]]; then line="$line; "; fi
   ssh "$verbose_ssh" -t -p "$port" "$user@$addr" "$line$*"
 }
 
 pull_tree() {
   local host_path="$user@$addr:$path"
-  if [[ -n "$sync" ]]; then
-    if [[ "$verbose_log" = true ]]; then log "pulling '$sync' folder from '$host_path'.."; fi
-    for dir in ${sync//,/ }; do
+  if [[ -n "$pull" ]]; then
+    if [[ "$verbose_log" = true ]]; then log "pulling '$pull' folder from '$host_path'.."; fi
+    for dir in ${pull//,/ }; do
       rsync $verbose_rsync -aze "ssh -p $port" "$host_path/$dir/" "$dir"
     done
   fi
@@ -78,7 +79,8 @@ user=username
 addr=0.0.0.0
 port=22
 path=project_dir
-sync=output_dir,logs
+push=input,data
+pull=output,logs
 ignore=.*,bin,build,tmp
 END
   cat "$config_file"
@@ -110,7 +112,8 @@ load_config() {
   if [[ -z ${addr+x} ]]; then err "'addr' not in config" "$try"; fi
   if [[ -z ${port+x} ]]; then err "'port' not in config" "$try"; fi
   if [[ -z ${path+x} ]]; then err "'path' not in config" "$try"; fi
-  if [[ -z ${sync+x} ]]; then err "'sync' not in config" "$try"; fi
+  if [[ -z ${push+x} ]]; then err "'push' not in config" "$try"; fi
+  if [[ -z ${pull+x} ]]; then err "'pull' not in config" "$try"; fi
   if [[ -z ${ignore+x} ]]; then err "'ignore' not in config" "$try"; fi
 
   if [[ -z "$user" ]]; then err "'user' not set in config" "$try"; fi

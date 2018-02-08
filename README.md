@@ -24,13 +24,13 @@ First create a config file that specifes the remote ip address and folder names:
 * `addr`: host name, e.g. `192.168.0.10`
 * `port`: port number to connect to, e.g. `22`
 * `path`: relative path on remote, e.g.  `projects/mything`
-* `sync`: folder to sync after running the command, e.g. `output` or `data,logs`
+* `push`: folder to sync before running the command, e.g. `input,data`
+* `pull`: folder to sync after running the command, e.g. `output,logs`
 * `ignore`: list of files and folders to exclude, e.g. `.*,bin,tmp`
 
 WARNING: *rex overwrites all remote files and folders on every run. Make sure to __backup all important data__ on the remote before continuing.*
 
-A slight exception to this is the sync folder, for which rex will overwrite files, but not delete any files or folders. This folder is both synced to the remote before running the command, and back to local after. The ignored items are not synced either way.
-
+A slight exception to this is the push and pull folder, for which rex will overwrite files, but not delete any files or folders.
 
 ## Run remotely
 

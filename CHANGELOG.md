@@ -5,6 +5,7 @@ Change Log
 
 * Add run only
 * Add multi sync
+* Split sync into push/pull
 
 ### 0.0.2 (2018-02-01)
 
