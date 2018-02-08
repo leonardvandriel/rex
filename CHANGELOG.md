@@ -4,6 +4,7 @@ Change Log
 ### master (untagged)
 
 * Add run only
+* Add multi sync
 
 ### 0.0.2 (2018-02-01)
 

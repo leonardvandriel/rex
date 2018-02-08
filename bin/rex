@@ -39,9 +39,11 @@ push_tree() {
   local host_path="$user@$addr:$path"
   if [[ "$verbose_log" = true ]]; then log "pushing full tree to '$host_path'.."; fi
   rsync $verbose_rsync -aze "ssh -p $port" $(exclude_arg $ignore $sync) --delete . "$host_path"
-  if [[ -n "$sync" ]] && [[ -d "$sync" ]]; then
+  if [[ -n "$sync" ]]; then
     if [[ "$verbose_log" = true ]]; then log "pushing '$sync' folder.."; fi
-    rsync $verbose_rsync -aze "ssh -p $port" $(exclude_arg $ignore) "$sync/" "$host_path/$sync"
+    for dir in ${sync//,/ }; do
+      rsync $verbose_rsync -aze "ssh -p $port" "$dir/" "$host_path/$dir"
+    done
   fi
 }
 
@@ -52,7 +54,7 @@ run_command() {
   if [[ "$verbose_log" = true ]]; then log "running remote command '$*' on '$host_path'.."; fi
   local line=""
   if [[ -n "$path" ]]; then line="$line cd $path"; fi
-  if [[ -n "$sync" ]]; then line="$line && mkdir -p $sync"; fi
+  if [[ -n "$sync" ]]; then line="$line && mkdir -p ${sync//,/ }"; fi
   if [[ -n "$line" ]]; then line="$line; "; fi
   ssh "$verbose_ssh" -t -p "$port" "$user@$addr" "$line$*"
 }
@@ -61,7 +63,9 @@ pull_tree() {
   local host_path="$user@$addr:$path"
   if [[ -n "$sync" ]]; then
     if [[ "$verbose_log" = true ]]; then log "pulling '$sync' folder from '$host_path'.."; fi
-    rsync $verbose_rsync -aze "ssh -p $port" $(exclude_arg $ignore) "$host_path/$sync/" "$sync"
+    for dir in ${sync//,/ }; do
+      rsync $verbose_rsync -aze "ssh -p $port" "$host_path/$dir/" "$dir"
+    done
   fi
 }
 
@@ -74,7 +78,7 @@ user=username
 addr=0.0.0.0
 port=22
 path=project_dir
-sync=output_dir
+sync=output_dir,logs
 ignore=.*,bin,build,tmp
 END
   cat "$config_file"
