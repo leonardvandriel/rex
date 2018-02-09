@@ -15,6 +15,7 @@ script_version=0.0.2
 script_bin=rex
 script_dir=.rex
 script_current=.current
+script_install=/usr/local/bin
 
 show_help() {
   cat <<END
@@ -124,7 +125,11 @@ load_config() {
 }
 
 install_bin() {
-  cp "bin/$script_bin" "/usr/local/bin"
+  cp "bin/$script_bin" "$script_install"
+}
+
+show_bin() {
+  "${EDITOR:-nano}" "$script_install/$script_bin"
 }
 
 show_version() {
@@ -167,6 +172,12 @@ main() {
     if [[ -n "$2" ]]; then err "unknown argument '$2'" "--install"; fi
     if [[ ! -f "bin/$script_bin" ]]; then err "can only install from source"; fi
     install_bin
+    exit
+  fi
+
+  if [[ "$1" = "--source" ]]; then
+    if [[ -n "$2" ]]; then err "unknown argument '$2'" "--source"; fi
+    show_bin
     exit
   fi
 
