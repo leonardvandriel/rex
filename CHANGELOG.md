@@ -3,9 +3,12 @@ Change Log
 
 ### master (untagged)
 
+### 0.0.3 (2018-02-09)
+
 * Add run only
 * Add multi sync
 * Split sync into push/pull
+* Add tests
 
 ### 0.0.2 (2018-02-01)
 

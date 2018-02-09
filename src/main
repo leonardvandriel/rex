@@ -12,7 +12,7 @@ set -e
 set -f
 
 script_name="rex"
-script_version="0.0.2"
+script_version="0.0.3"
 script_install="/usr/local/bin"
 script_src="src/main"
 script_bin="$script_name"
