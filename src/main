@@ -32,6 +32,7 @@ usage: $script_bin [option]
    $script_bin --edit config, -e   edit existing config
    $script_bin --list, -l          list available configs
    $script_bin --current, -c       show current config
+   $script_bin --use config, -u    use config just once
    $script_bin --push, -s          sync push dir to remote
    $script_bin --pull, -p          sync pull dir to local
    $script_bin --version           show version
@@ -127,7 +128,7 @@ load_config() {
 }
 
 install_bin() {
-  cp "$script_src" "$script_install"
+  cp "$script_src" "$script_install/$script_bin"
 }
 
 show_bin() {
@@ -234,9 +235,16 @@ main() {
 
   ## find config
 
-  if [[ ! -f "$script_dir/$script_current" ]]; then err "no config selected" "--init config"; fi
-
-  current_config="$(cat "$script_dir/$script_current")"
+  if [[ "$1" = "--use" ]] || [[ "$1" = "-u" ]]; then
+    if [[ -z "$2" ]]; then err "specify config to use" "--use ${available}"; fi
+    if [[ ! -f "$script_dir/$2" ]]; then err "config '$2' does not exist" "--use ${available}"; fi
+    current_config="$2"
+    shift
+    shift
+  else
+    if [[ ! -f "$script_dir/$script_current" ]]; then err "no config selected" "--init config"; fi
+    current_config="$(cat "$script_dir/$script_current")"
+  fi
 
   if [[ ! -f "$script_dir/$current_config" ]]; then err "invalid config selected" "--select ${available}"; fi
 
