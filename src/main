@@ -42,7 +42,7 @@ END
 push_tree() {
   local host_path="$user@$addr:$path"
   if [[ "$verbose_log" = true ]]; then log "pushing full tree to '$host_path'.."; fi
-  rsync $verbose_rsync -aze "ssh -p $port" $(exclude_arg $ignore $pull $push) --delete . "$host_path"
+  rsync $verbose_rsync -aze "ssh -p $port" $(exclude_arg $ignore $(prefix_items / $pull) $(prefix_items / $push)) --delete . "$host_path"
   if [[ -n "$push" ]]; then
     if [[ "$verbose_log" = true ]]; then log "pushing '$push' folder.."; fi
     mkdir -p ${push//,/ }
@@ -85,7 +85,7 @@ port=22
 path=project_dir
 push=input,data
 pull=output,logs
-ignore=.*,bin,build,tmp
+ignore=/.*,/bin,/build,tmp
 END
   cat "$config_file"
   echo "$1" > "$current_file"
@@ -138,13 +138,19 @@ show_version() {
   echo "$script_version"
 }
 
+prefix_items() {
+  if [[ -n "$2" ]]; then
+    echo $1${2//,/,$1}
+  fi
+}
+
 exclude_arg() {
-  local list="$script_dir"
+  local list="/$script_dir"
   if [[ -n "$1" ]]; then list="$list,$1"; fi
   if [[ -n "$2" ]]; then list="$list,$2"; fi
   if [[ -n "$3" ]]; then list="$list,$3"; fi
   if [[ -n "$4" ]]; then list="$list,$4"; fi
-  local args="--exclude=/${list//,/ --exclude=/}"
+  local args="--exclude=${list//,/ --exclude=}"
   echo "$args"
 }
 
