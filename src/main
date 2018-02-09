@@ -11,11 +11,13 @@
 set -e
 set -f
 
-script_version=0.0.2
-script_bin=rex
-script_dir=.rex
-script_current=.current
-script_install=/usr/local/bin
+script_name="rex"
+script_version="0.0.2"
+script_install="/usr/local/bin"
+script_src="src/main"
+script_bin="$script_name"
+script_dir=".$script_name"
+script_current=".current"
 
 show_help() {
   cat <<END
@@ -125,7 +127,7 @@ load_config() {
 }
 
 install_bin() {
-  cp "bin/$script_bin" "$script_install"
+  cp "$script_src" "$script_install"
 }
 
 show_bin() {
@@ -170,7 +172,7 @@ main() {
 
   if [[ "$1" = "--install" ]]; then
     if [[ -n "$2" ]]; then err "unknown argument '$2'" "--install"; fi
-    if [[ ! -f "bin/$script_bin" ]]; then err "can only install from source"; fi
+    if [[ ! -f "$script_src" ]]; then err "can only install from source"; fi
     install_bin
     exit
   fi
