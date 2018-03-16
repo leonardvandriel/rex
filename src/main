@@ -61,6 +61,7 @@ run_command() {
   local line=""
   if [[ -n "$path" ]]; then line="$line cd $path"; fi
   if [[ -n "$pull" ]]; then line="$line && mkdir -p ${pull//:/ }"; fi
+  if [[ -n "$prerun" ]]; then line="$line && $prerun"; fi
   if [[ -n "$line" ]]; then line="$line; "; fi
   ssh "$verbose_ssh" -t -p "$port" "$user@$addr" "$line$*"
 }
@@ -87,6 +88,7 @@ path=project_dir
 push=input:data
 pull=output:logs
 ignore=/.*:/bin:/build:tmp
+prerun=
 END
   cat "$config_file"
   echo "$1" > "$current_file"
@@ -120,6 +122,7 @@ load_config() {
   if [[ -z ${push+x} ]]; then err "'push' not in config" "$try"; fi
   if [[ -z ${pull+x} ]]; then err "'pull' not in config" "$try"; fi
   if [[ -z ${ignore+x} ]]; then err "'ignore' not in config" "$try"; fi
+  if [[ -z ${prerun+x} ]]; then err "'prerun' not in config" "$try"; fi
 
   if [[ -z "$user" ]]; then err "'user' not set in config" "$try"; fi
   if [[ -z "$addr" ]]; then err "'addr' not set in config" "$try"; fi
