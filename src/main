@@ -46,8 +46,8 @@ push_tree() {
   rsync $verbose_rsync -aze "ssh -p $port" $(exclude_arg $ignore $(prefix_items / $pull) $(prefix_items / $push)) --delete . "$host_path"
   if [[ -n "$push" ]]; then
     if [[ "$verbose_log" = true ]]; then log "pushing '$push' folder.."; fi
-    mkdir -p ${push//,/ }
-    for dir in ${push//,/ }; do
+    mkdir -p ${push//:/ }
+    for dir in ${push//:/ }; do
       rsync $verbose_rsync -aze "ssh -p $port" "$dir/" "$host_path/$dir"
     done
   fi
@@ -60,7 +60,7 @@ run_command() {
   if [[ "$verbose_log" = true ]]; then log "running remote command '$*' on '$host_path'.."; fi
   local line=""
   if [[ -n "$path" ]]; then line="$line cd $path"; fi
-  if [[ -n "$pull" ]]; then line="$line && mkdir -p ${pull//,/ }"; fi
+  if [[ -n "$pull" ]]; then line="$line && mkdir -p ${pull//:/ }"; fi
   if [[ -n "$line" ]]; then line="$line; "; fi
   ssh "$verbose_ssh" -t -p "$port" "$user@$addr" "$line$*"
 }
@@ -69,7 +69,7 @@ pull_tree() {
   local host_path="$user@$addr:$path"
   if [[ -n "$pull" ]]; then
     if [[ "$verbose_log" = true ]]; then log "pulling '$pull' folder from '$host_path'.."; fi
-    for dir in ${pull//,/ }; do
+    for dir in ${pull//:/ }; do
       rsync $verbose_rsync -aze "ssh -p $port" "$host_path/$dir/" "$dir"
     done
   fi
@@ -84,9 +84,9 @@ user=username
 addr=0.0.0.0
 port=22
 path=project_dir
-push=input,data
-pull=output,logs
-ignore=/.*,/bin,/build,tmp
+push=input:data
+pull=output:logs
+ignore=/.*:/bin:/build:tmp
 END
   cat "$config_file"
   echo "$1" > "$current_file"
@@ -141,17 +141,17 @@ show_version() {
 
 prefix_items() {
   if [[ -n "$2" ]]; then
-    echo $1${2//,/,$1}
+    echo $1${2//:/:$1}
   fi
 }
 
 exclude_arg() {
   local list="/$script_dir"
-  if [[ -n "$1" ]]; then list="$list,$1"; fi
-  if [[ -n "$2" ]]; then list="$list,$2"; fi
-  if [[ -n "$3" ]]; then list="$list,$3"; fi
-  if [[ -n "$4" ]]; then list="$list,$4"; fi
-  local args="--exclude=${list//,/ --exclude=}"
+  if [[ -n "$1" ]]; then list="$list:$1"; fi
+  if [[ -n "$2" ]]; then list="$list:$2"; fi
+  if [[ -n "$3" ]]; then list="$list:$3"; fi
+  if [[ -n "$4" ]]; then list="$list:$4"; fi
+  local args="--exclude=${list//:/ --exclude=}"
   echo "$args"
 }
 

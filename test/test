@@ -47,7 +47,7 @@ _setup() {
   cat .rex/test > $script_path
   echo "push=$1" >> $script_path
   echo "pull=$2" >> $script_path
-  echo "ignore=/.*,$3" >> $script_path
+  echo "ignore=/.*:$3" >> $script_path
   mkdir -p $script_temp
 }
 
