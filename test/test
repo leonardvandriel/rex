@@ -8,39 +8,54 @@ script_run="$script_bin --use $script_config"
 script_path=".rex/$script_config"
 script_temp="test/tmp"
 
-_assert_eq() {
-  if [[ "$1" != "$2" ]]; then echo "'$1' != '$2'"; exit 1; fi
+_assert_equal() {
+  if [[ "$1" != "$2" ]]; then echo "error: '$1' != '$2'"; exit 1; fi
+}
+
+_assert_match() {
+  if [[ ! "$1" =~ $2 ]]; then echo "error: '$1' !~ '$2'"; exit 1; fi
 }
 
 test_run() {
   local text='echo some text'
   local result=$($script_run --run echo -n "$text")
-  _assert_eq "$result" "$text"
+  _assert_equal "$result" "$text"
 }
 
 test_push() {
-  local file="$script_temp/push/file.txt"
+  local dir="$script_temp/push"
+  local file="$dir/file.txt"
   local text='cat a file'
-  mkdir -p $script_temp/push
   echo -n $text > $file
   local result=$($script_run cat $file)
-  _assert_eq "$result" "$text"
+  _assert_equal "$result" "$text"
 }
 
 test_pull() {
-  local file="$script_temp/pull/file.txt"
+  local dir="$script_temp/pull"
+  local file="$dir/file.txt"
   local text='echo remotely and pull'
-  local result=$($script_run mkdir -p $script_temp/pull '&&' echo -n $text \> $file)
-  _assert_eq "$(cat $file)" "$text"
+  local result=$($script_run echo -n $text \> $file)
+  _assert_equal "$(cat $file)" "$text"
 }
 
 test_ignore_relative() {
-  local dir=$script_temp/a/b
-  _setup "" "" "relative"
-  mkdir -p $dir
+  local dir="$script_temp/sync"
+  _setup "" "" "relative" ""
   echo -n "should be ignored" > $dir/relative
   local result=$($script_run test -f $dir/relative '&&' echo -n 'exists' '||' echo -n 'doesnt')
-  _assert_eq "$result" "doesnt"
+  _assert_equal "$result" "doesnt"
+}
+
+test_dry_run() {
+  local dir="$script_temp/sync"
+  local file="$dir/file.txt"
+  local text='cat a file'
+  echo -n $text > $file
+  local result=$($script_run --dry cat $file | tr '\r\n' '%')
+  _assert_match "$result" ".* $file%.*"
+  _assert_match "$result" ".* [.]/%.*[.]/%.*"
+  _assert_match "$result" ".* cd .* && mkdir -p $script_temp/pull; cat $file%.*"
 }
 
 _setup() {
@@ -48,18 +63,21 @@ _setup() {
   echo "push=$1" >> $script_path
   echo "pull=$2" >> $script_path
   echo "ignore=/.*:$3" >> $script_path
-  mkdir -p $script_temp
+  local cmd="mkdir -p $1 $2 $3 $4"
+  eval $cmd
+  $script_bin --run $cmd
 }
 
 _cleanup() {
-  rm -rf $script_temp/*
-  $script_bin --run rm -rf $script_temp/*
+  local cmd="rm -rf $script_temp/*"
+  eval $cmd
+  $script_bin --run $cmd
 }
 
 _run() {
-  _setup $script_temp/push $script_temp/pull $script_temp/ignore
+  _setup $script_temp/push $script_temp/pull $script_temp/ignore $script_temp/sync
   echo "testing $1.."
-  test_$1 $1
+  test_$1
   _cleanup
 }
 
@@ -70,12 +88,15 @@ main() {
   else
     local lines=$(declare -F)
     local funcs=${lines//declare -f /}
+    local count=0
     for func in $funcs ; do
       if [[ $func = test_* ]]; then
         local name=${func//test_/}
         _run $name
+        counter=$((counter+1))
       fi
     done
+    echo $counter tests completed
   fi
   rm -rf $1 $script_path
 }

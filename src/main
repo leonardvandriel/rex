@@ -23,7 +23,9 @@ show_help() {
   cat <<END
 usage: $script_bin [options] [command]
    $script_bin [options] command   sync and run command remotely
-       --run, -r           only run command, no sync
+       --run, -r           only run command, no push/pull
+       --dry, -y           dry-run command, show diff
+       --use config, -u    use config, just once
        --verbose, -v       show verbose output
        --debug, -d         show debug output
 usage: $script_bin [option]
@@ -32,7 +34,6 @@ usage: $script_bin [option]
    $script_bin --edit config, -e   edit existing config
    $script_bin --list, -l          list available configs
    $script_bin --current, -c       show current config
-   $script_bin --use config, -u    use config just once
    $script_bin --push, -s          sync push dir to remote
    $script_bin --pull, -p          sync pull dir to local
    $script_bin --version           show version
@@ -63,7 +64,11 @@ run_command() {
   if [[ -n "$pull" ]]; then line="$line && mkdir -p ${pull//:/ }"; fi
   if [[ -n "$prerun" ]]; then line="$line && $prerun"; fi
   if [[ -n "$line" ]]; then line="$line; "; fi
-  ssh "$verbose_ssh" -t -p "$port" "$user@$addr" "$line$*"
+  if [[ "$dry_run" = true ]]; then
+    echo "$line$*"
+  else
+    ssh "$verbose_ssh" -t -p "$port" "$user@$addr" "$line$*"
+  fi
 }
 
 pull_tree() {
@@ -265,16 +270,17 @@ main() {
   verbose_rsync=""
   verbose_log=false
   run_only=false
+  dry_run=false
 
   while true; do
     case "$1" in
       -v|--verbose)
-        verbose_rsync="$verbose_rsync --progress"
+        verbose_rsync="$verbose_rsync --progress --itemize-changes"
         verbose_log=true
         shift
         ;;
       -d|--debug)
-        verbose_rsync="$verbose_rsync -v --stats -i"
+        verbose_rsync="$verbose_rsync --verbose --stats --itemize-changes"
         verbose_ssh="-v"
         verbose_log=true
         set -x
@@ -282,6 +288,11 @@ main() {
         ;;
       -r|--run)
         run_only=true
+        shift
+        ;;
+      -y|--dry)
+        verbose_rsync="$verbose_rsync --dry-run --itemize-changes"
+        dry_run=true
         shift
         ;;
       *)
