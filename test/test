@@ -16,46 +16,16 @@ _assert_match() {
   if [[ ! "$1" =~ $2 ]]; then echo "error: '$1' !~ '$2'"; exit 1; fi
 }
 
-test_run() {
-  local text='echo some text'
-  local result=$($script_run --run echo -n "$text")
-  _assert_equal "$result" "$text"
-}
-
-test_push() {
-  local dir="$script_temp/push"
-  local file="$dir/file.txt"
-  local text='cat a file'
-  echo -n $text > $file
-  local result=$($script_run cat $file)
-  _assert_equal "$result" "$text"
-}
-
-test_pull() {
-  local dir="$script_temp/pull"
-  local file="$dir/file.txt"
-  local text='echo remotely and pull'
-  local result=$($script_run echo -n $text \> $file)
-  _assert_equal "$(cat $file)" "$text"
-}
-
-test_ignore_relative() {
-  local dir="$script_temp/sync"
-  _setup "" "" "relative" ""
-  echo -n "should be ignored" > $dir/relative
-  local result=$($script_run test -f $dir/relative '&&' echo -n 'exists' '||' echo -n 'doesnt')
-  _assert_equal "$result" "doesnt"
-}
-
-test_dry_run() {
-  local dir="$script_temp/sync"
-  local file="$dir/file.txt"
-  local text='cat a file'
-  echo -n $text > $file
-  local result=$($script_run --dry cat $file | tr '\r\n' '%')
-  _assert_match "$result" ".* $file%.*"
-  _assert_match "$result" ".* [.]/%.*[.]/%.*"
-  _assert_match "$result" ".* cd .* && mkdir -p $script_temp/pull; cat $file%.*"
+_load() {
+  local base=$1
+  shift
+  ls -1 $base | while read line; do
+    if [[ "$line" != "test" && "$line" != "tmp" ]]; then
+      local path="$base/$line"
+      echo source $path
+      source $path
+    fi
+  done
 }
 
 _setup() {
@@ -77,26 +47,27 @@ _cleanup() {
 _run() {
   _setup $script_temp/push $script_temp/pull $script_temp/ignore $script_temp/sync
   echo "testing $1.."
-  test_$1
+  $1
   _cleanup
 }
 
 main() {
   _cleanup
   if [[ -n $1 ]]; then
-    _run $1
-  else
-    local lines=$(declare -F)
-    local funcs=${lines//declare -f /}
-    local count=0
-    for func in $funcs ; do
-      if [[ $func = test_* ]]; then
-        local name=${func//test_/}
-        _run $name
-        counter=$((counter+1))
-      fi
+    while [[ -n "$1" ]]; do
+      _run "$1"
+      shift
     done
-    echo $counter tests completed
+  else
+    local dir=$(dirname $0)
+    local dirs=$(ls -1 $dir)
+    for line in $dirs; do
+      if [[ "$line" != "test" && "$line" != "tmp" ]]; then
+        local path="$dir/$line"
+        echo testing in $line:
+        $path
+      fi
+    done    # local lines=$(declare -F)
   fi
   rm -rf $1 $script_path
 }

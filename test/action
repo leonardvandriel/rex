@@ -1,0 +1,37 @@
+#!/bin/bash
+
+test_run() {
+  local text='echo some text'
+  local result=$($script_run --run echo -n "$text")
+  _assert_equal "$result" "$text"
+}
+
+test_push() {
+  local dir="$script_temp/push"
+  local file="$dir/file.txt"
+  local text='cat a file'
+  echo -n $text > $file
+  local result=$($script_run cat $file)
+  _assert_equal "$result" "$text"
+}
+
+test_pull() {
+  local dir="$script_temp/pull"
+  local file="$dir/file.txt"
+  local text='echo remotely and pull'
+  local result=$($script_run echo -n $text \> $file)
+  _assert_equal "$(cat $file)" "$text"
+}
+
+test_dry_run() {
+  local dir="$script_temp/sync"
+  local file="$dir/file.txt"
+  local text='cat a file'
+  echo -n $text > $file
+  local result=$($script_run --dry cat $file | tr '\r\n' '%')
+  _assert_match "$result" ".* $file%.*"
+  # _assert_match "$result" ".* [.]/%.*[.]/%.*"
+  _assert_match "$result" ".*cd .* && mkdir -p $script_temp/pull && cat $file%.*"
+}
+
+source $(dirname $0)/test $(declare -F | cut -d" " -f3)

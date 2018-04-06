@@ -1,0 +1,11 @@
+#!/bin/bash
+
+test_ignore_relative() {
+  local dir="$script_temp/sync"
+  _setup "" "" "relative" ""
+  echo -n "should be ignored" > $dir/relative
+  local result=$($script_run test -f $dir/relative '&&' echo -n 'exists' '||' echo -n 'doesnt')
+  _assert_equal "$result" "doesnt"
+}
+
+source $(dirname $0)/test $(declare -F | cut -d" " -f3)

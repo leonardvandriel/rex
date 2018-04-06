@@ -4,7 +4,7 @@
 
 *code here, run there.*
 
-A simple utility to develop code locally, but test and run in remotely. Just prefix your command with `rex` and it will run remotely. Output is echoed right back and the folder tree is synced before and after. As seemless as it gets.
+A simple utility to develop code locally and run it remotely. Just prefix your command with `rex`. Output is echoed right back and the folder tree is synced before and after. As seemless as it gets.
 
 
 ## Install
@@ -108,3 +108,8 @@ To select another configuration:
 For more info:
 
     rex --help
+
+
+## Test
+
+All tests can be run with `./test/test`.
