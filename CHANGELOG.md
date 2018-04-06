@@ -3,6 +3,12 @@ Change Log
 
 ### master (untagged)
 
+### 0.0.4 (2018-04-06)
+
+* Add dry run
+* Add pre run command
+* Change to colon separator
+
 ### 0.0.3 (2018-02-09)
 
 * Add run only
