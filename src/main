@@ -60,14 +60,13 @@ run_command() {
   if [[ -z "$cmd" ]]; then err "no command provided" "run ls"; fi
   if [[ "$verbose_log" = true ]]; then log "running remote command '$*' on '$host_path'.."; fi
   local line=""
-  if [[ -n "$path" ]]; then line="$line cd $path"; fi
-  if [[ -n "$pull" ]]; then line="$line && mkdir -p ${pull//:/ }"; fi
-  if [[ -n "$prerun" ]]; then line="$line && $prerun"; fi
-  if [[ -n "$line" ]]; then line="$line; "; fi
+  if [[ -n "$path" ]]; then line="${line}cd $path && "; fi
+  if [[ -n "$pull" ]]; then line="${line}mkdir -p ${pull//:/ } && "; fi
+  if [[ -n "$prerun" ]]; then line="${line}$prerun && "; fi
   if [[ "$dry_run" = true ]]; then
-    echo "$line$*"
+    echo "${line}$*"
   else
-    ssh "$verbose_ssh" -t -p "$port" "$user@$addr" "$line$*"
+    ssh "$verbose_ssh" -t -p "$port" "$user@$addr" "${line}$*"
   fi
 }
 
